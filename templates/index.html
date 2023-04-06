@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>自建代理池</title>
+    <!-- 引入 layui.css -->
+    <link href="//unpkg.com/layui@2.7.6/dist/css/layui.css" rel="stylesheet">
+    <!-- 引入 layui.js -->
+    <script src="//unpkg.com/layui@2.7.6/dist/layui.js"></script>
+</head>
+<body>
+<ul class="layui-nav layui-bg-cyan">
+    <li class="layui-nav-item"><a href="">PFinaClub自建代理池</a></li>
+    <li class="layui-nav-item layui-this"><a href="">首页</a></li>
+    <li class="layui-nav-item"><a onclick="check()">清洗代理</a></li>
+    <li class="layui-nav-item"><a href="">文档</a></li>
+</ul>
+<div class="layui-container">
+    <div class="layui-card">
+        <div class="layui-card-header">代理Ips( <small><span class="layui-badge-dot layui-bg-orange"></span>
+            {{ ip_count }}个</small> )
+        </div>
+        <div class="layui-card-body">
+            <table class="layui-table">
+                <thead>
+                <tr>
+                    <th>IP</th>
+                    <th>Port</th>
+                    <th>协议</th>
+                    <th>测试时间</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for ip in ip_list %}
+                    <tr>
+                        <td>{{ ip['ip'] }}</td>
+                        <td>{{ ip['port'] }} </td>
+                        <td>{{ ip['http'] }}</td>
+                        <td>{{ ip['time'] }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+<script>
+    //注意：导航 依赖 element 模块，否则无法进行功能性操作     
+    layui.use(['element', 'jquery', 'layer'], function () {
+        let element = layui.element;
+        let $ = layui.$
+        let layer = layui.layer
+        window.check = function () {
+            var loading = layer.load();
+            $.ajax({
+                type: 'GET',
+                url: './check',
+                async: true,
+                success: function (res) {
+                    console.log(res)
+                    if (res.status) {
+                        layer.close(loading)
+                        layer.alert('清洗成功')
+                        window.reload()
+                    }
+                    {#layer.close(loading)#}
+                    {#layer.alert('清洗成功')#}
+                }
+            })
+            return false
+        }
+    })
+</script>
+</body>
+</html>
