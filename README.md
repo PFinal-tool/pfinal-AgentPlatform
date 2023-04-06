@@ -5,7 +5,7 @@
 pfinal-AgentPlatform 自建的代理IP池平台
 
 工作面板如图所示:
-[](https://github.com/PFinal-tool/pfinal-AgentPlatform/blob/master/image/main.jpg)
+![](https://github.com/PFinal-tool/pfinal-AgentPlatform/blob/master/image/main.jpg)
 
 提取接口:
 
