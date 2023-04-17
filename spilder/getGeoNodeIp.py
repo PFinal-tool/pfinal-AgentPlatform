@@ -4,10 +4,6 @@
 # @Email   : lampxiezi@163.com
 # @File    : getGeoNodeIp.py
 # @Software: PyCharm
-# import requests
-#
-# res = requests.get("https://proxylist.geonode.com/api/proxy-list?limit=500&page=1&sort_by=lastChecked&sort_type=desc&protocols=http%2Chttps")
-# print(res.json())
 import time
 from multiprocessing import Pool
 

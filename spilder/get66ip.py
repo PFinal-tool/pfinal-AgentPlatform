@@ -1,9 +1,15 @@
-import requests
-from lxml import etree
-import pymongo
-from getip import GETIP
 import time
 from multiprocessing import Pool
+
+import pymongo
+import requests
+from lxml import etree
+
+import sys
+
+sys.path.append("..")
+
+from getip import GETIP
 
 
 class GetFreeIP:
@@ -80,7 +86,7 @@ class GetFreeIP:
         print('用时:', time.time() - start)
 
 
-def run_get66ip(self):
+def run_get66ip():
     GetFreeIP(start_page=21, end_page=200).run()
 
 
