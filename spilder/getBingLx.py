@@ -57,7 +57,7 @@ class GetBingLx:
             pass
 
     def save_data(self, ok_ip_list):
-        client = pymongo.MongoClient(host='localhost', port=27017)
+        client = pymongo.MongoClient(host='localhost', port=27017, username='username', password='password')
         db = client["ip_proxy"]
         for d in ok_ip_list:
             exists = db.ip_proxy.count_documents({'http': d, 'time': time.time()})

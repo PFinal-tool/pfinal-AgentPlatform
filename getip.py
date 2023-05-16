@@ -73,4 +73,4 @@ class GETIP:
 
 
 if __name__ == '__main__':
-    print(GETIP().run())
+    GETIP().run()

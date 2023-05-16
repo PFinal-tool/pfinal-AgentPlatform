@@ -5,6 +5,11 @@ from getip import GETIP
 app = Flask(__name__)
 
 
+@app.route('/', methods=['GET'])
+def home():
+    return render_template('404.html')
+
+
 @app.route('/index', methods=['GET'])
 def index():
     key = request.args.get('key')
@@ -31,5 +36,6 @@ def api():
 
 if __name__ == '__main__':
     from gevent import pywsgi
+
     server = pywsgi.WSGIServer(('0.0.0.0', 8456), app)
     server.serve_forever()

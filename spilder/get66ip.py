@@ -86,9 +86,9 @@ class GetFreeIP:
         print('用时:', time.time() - start)
 
 
-def run_get66ip():
+def Get66Ip():
     GetFreeIP(start_page=21, end_page=200).run()
 
 
 if __name__ == '__main__':
-    run_get66ip()
+    Get66Ip()
