@@ -36,6 +36,5 @@ def api():
 
 if __name__ == '__main__':
     from gevent import pywsgi
-
     server = pywsgi.WSGIServer(('0.0.0.0', 8456), app)
     server.serve_forever()
