@@ -55,7 +55,7 @@
             $.ajax({
                 type: 'GET',
                 url: './check',
-                async: true,
+                async: false,
                 success: function (res) {
                     console.log(res)
                     if (res.status) {
