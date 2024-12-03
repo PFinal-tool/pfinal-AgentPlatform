@@ -9,7 +9,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 class IPChecker:
     def __init__(self):
-        self.client = AsyncIOMotorClient()
+        self.client =  AsyncIOMotorClient()
         self.collection = self.client.your_database.your_collection
         self.headers = {'User-Agent': 'Your User Agent'}
 
