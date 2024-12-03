@@ -1,3 +1,5 @@
+import asyncio
+
 from flask import Flask, jsonify, request, render_template
 
 from getip import GETIP
@@ -20,8 +22,9 @@ def index():
 
 
 @app.route('/check', methods=['GET'])
-def check():
-    result = GETIP().check_ip_list()
+async def check():
+    getip = GETIP()
+    result = await asyncio.create_task(getip.check_ip_list())
     return jsonify({'status': True, 'data': result})
 
 

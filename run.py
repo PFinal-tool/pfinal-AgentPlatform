@@ -21,12 +21,12 @@ def run():
     # }
     # scheduler = BackgroundScheduler(executors=executors)
     try:
-        # GetKxDaiLiIp(10).run()  # 导入快代理
-        GetIp3366(1).run()  # 导入Ip3366
-        GetGeoNode().run()
-        get66Ip()
-        GetBeesproxy(20).run()
-        GetLumiproxy(20).run()
+        GetLumiproxy(2).run()
+        # GetIp3366(1).run()  # 导入Ip3366
+        # GetGeoNode().run()
+        # get66Ip()
+        # GetBeesproxy(20).run()
+
     except Exception as e:
         print(e)
 

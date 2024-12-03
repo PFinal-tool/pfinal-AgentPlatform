@@ -1,49 +1,75 @@
+import asyncio
+import logging
 import random
 import time
 
 import aiohttp
 import pymongo
 import requests
+from aiohttp import ClientTimeout, ClientError
 from motor.motor_asyncio import AsyncIOMotorClient
-
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 class IPChecker:
     def __init__(self):
         self.client = AsyncIOMotorClient()
-        self.collection = self.client.your_database.your_collection
+        self.collection = self.client['ip_proxy']['ip_proxy']
         self.headers = {'User-Agent': 'Your User Agent'}
 
-    async def check_single_ip(self, ip):
-        ip_info = ip['http'].split("//")
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get('http://httpbin.org/ip',
-                                       headers=self.headers,
-                                       proxy=f"{ip_info[0]}://{ip_info[1]}",
-                                       timeout=10) as res:
-                    if res.status == 200:
-                        json_res = await res.json()
-                        if json_res['origin']:
-                            print('IP可用', ip)
-                            ip['time'] = time.time()
-                            await self.collection.update_one({'http': ip['http']}, {"$set": ip})
-                            return True
-        except Exception as e:
-            print('error信息--->', e)
-            print(f'IP不可用,正在删除:{ip}')
-            await self.collection.delete_one({'http': ip['http']})
+    async def check_single_ip(self, ip, max_retries=3):
+        for attempt in range(max_retries):
+            ip_info = ip['http'].split("//")
+            try:
+                timeout = ClientTimeout(total=10)
+                async with aiohttp.ClientSession(timeout=timeout) as session:
+                    async with session.get('http://httpbin.org/ip',
+                                           headers=self.headers,
+                                           proxy=f"{ip_info[0].replace(':','')}://{ip_info[1]}") as res:
+                        if res.status == 200:
+                            json_res = await res.json()
+                            if 'origin' in json_res:
+                                logging.info(f'IP可用: {ip}')
+                                ip['time'] = time.time()
+                                await self.collection.update_one({'http': ip['http']}, {"$set": ip})
+                                return True
+                        logging.warning(f'IP {ip["http"]} 返回状态码 {res.status}')
+            except (ClientError, TimeoutError) as e:
+                logging.error(f'尝试 {attempt + 1}/{max_retries} 失败 {ip["http"]}: {str(e)}')
+                if attempt == max_retries - 1:
+                    break
+                await asyncio.sleep(1)  # 在重试之前等待1秒
+            except Exception as e:
+                logging.error(f'未知错误 {ip["http"]}: {str(e)}')
+                break
+
+        logging.info(f'IP不可用,正在删除: {ip}')
+        await self.collection.delete_one({'http': ip['http']})
         return False
 
     async def check_ip_list(self):
+        logging.info("Starting check_ip_list")
         success = errors = 0
+        tasks = []
         async for ip in self.collection.find({}):
-            result = await self.check_single_ip(ip)
-            if result:
+            logging.info(f"Adding task for IP: {ip['http']}")
+            tasks.append(self.check_single_ip(ip))
+        if not tasks:
+            logging.warning("No tasks created. Database might be empty.")
+        else:
+            logging.info(f"Created {len(tasks)} tasks")
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for result in results:
+            if isinstance(result, Exception):
+                logging.error(f"Error occurred: {str(result)}")
+                errors += 1
+            elif result:
                 success += 1
             else:
                 errors += 1
-        return {"status": True, "success": success, 'errors': errors}
 
+        logging.info(f"Check completed. Success: {success}, Errors: {errors}")
+        return {"status": True, "success": success, 'errors': errors}
 
 class GETIP:
     def __init__(self):
@@ -104,11 +130,21 @@ class GETIP:
         return {"ip_list": ips, "ip_count": len(ips)}
 
     async def check_ip_list(self):
-        success = errors = 0
         checker = IPChecker()
         result = await checker.check_ip_list()
-        print(result)
-        return {"status": True, "success": success, 'errors': errors}
+
+        # Directly use the success and errors values from the result
+        success = result.get('success', 0)
+        errors = result.get('errors', 0)
+
+        print(f"Check completed. Success: {success}, Errors: {errors}")
+
+        return {
+            "status": True,
+            "success": success,
+            'errors': errors,
+            'result': result  # 包含详细结果
+        }
 
     def run(self):
         ok_ip = self.get_ip()
@@ -117,4 +153,4 @@ class GETIP:
 
 
 if __name__ == '__main__':
-    GETIP().run()
+    GETIP().check_ip_list()
