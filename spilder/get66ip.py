@@ -9,9 +9,6 @@ import sys
 
 sys.path.append("..")
 
-from getip import GETIP
-
-
 class GetFreeIP:
     def __init__(self, start_page, end_page):
         self.headers = {
@@ -24,7 +21,7 @@ class GetFreeIP:
         }
         self.url = ["http://www.66ip.cn/", ]
         self.end_page = end_page
-        self.ip_proxy = GETIP().run()
+        # self.ip_proxy = GETIP().run()
         self.start = start_page
 
     def get_html(self):
@@ -35,7 +32,7 @@ class GetFreeIP:
         url_list = url
         ip_list = []
         try:
-            res = requests.get(url, headers=self.headers, proxies={'http': self.ip_proxy}, timeout=2)
+            res = requests.get(url, headers=self.headers, timeout=2)
             html = etree.HTML(res.text)
             ip_port = [i.strip() for i in html.xpath('//tr[position()>1]/td[position()<=2]/text()')]
             num = len(ip_port)
@@ -44,7 +41,6 @@ class GetFreeIP:
                 ip_a_port = 'http://' + str(ip_port[q]) + ':' + str(ip_port[q + 1])
                 ip_list.append(ip_a_port)
         except Exception as e:
-            self.ip_proxy = GETIP().run()
             error_page = url_list.index(url)
             self.get_data(url_list[error_page:])
         return ip_list

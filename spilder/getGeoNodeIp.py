@@ -37,8 +37,9 @@ class GetGeoNode:
         client.close()
 
     def check_ip(self, ip):
+        ip_info = ip.split("//")
         try:
-            res = requests.get('http://httpbin.org/ip', headers=self.headers, proxies={'http': ip},
+            res = requests.get('http://httpbin.org/ip', proxies={ip_info[0].replace(':',''): ip_info[1]},
                                timeout=2)
             if res.status_code == 200:
                 print('IP可用-->', ip)
@@ -48,10 +49,7 @@ class GetGeoNode:
 
     def run(self):
         start = time.time()
-        ip_lists = []
-        ip_list = self.get_data(self.url)
-        for i in ip_list:
-            ip_lists += i
+        ip_lists = self.get_data(self.url)
         pool2 = Pool(processes=5)
         check_ip_list = pool2.map(self.check_ip, ip_lists)
         ok_ip = [i for i in check_ip_list if i is not None]

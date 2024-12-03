@@ -1,8 +1,48 @@
 import random
 import time
 
+import aiohttp
 import pymongo
 import requests
+from motor.motor_asyncio import AsyncIOMotorClient
+
+
+class IPChecker:
+    def __init__(self):
+        self.client = AsyncIOMotorClient()
+        self.collection = self.client.your_database.your_collection
+        self.headers = {'User-Agent': 'Your User Agent'}
+
+    async def check_single_ip(self, ip):
+        ip_info = ip['http'].split("//")
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get('http://httpbin.org/ip',
+                                       headers=self.headers,
+                                       proxy=f"{ip_info[0]}://{ip_info[1]}",
+                                       timeout=10) as res:
+                    if res.status == 200:
+                        json_res = await res.json()
+                        if json_res['origin']:
+                            print('IP可用', ip)
+                            ip['time'] = time.time()
+                            await self.collection.update_one({'http': ip['http']}, {"$set": ip})
+                            return True
+        except Exception as e:
+            print('error信息--->', e)
+            print(f'IP不可用,正在删除:{ip}')
+            await self.collection.delete_one({'http': ip['http']})
+        return False
+
+    async def check_ip_list(self):
+        success = errors = 0
+        async for ip in self.collection.find({}):
+            result = await self.check_single_ip(ip)
+            if result:
+                success += 1
+            else:
+                errors += 1
+        return {"status": True, "success": success, 'errors': errors}
 
 
 class GETIP:
@@ -24,7 +64,7 @@ class GETIP:
         ips = random.choice(ip_list)
         print('用这个ip请求--->', ips)
         try:
-            res = requests.get('http://httpbin.org/ip', headers=self.headers, proxies={'http': f'{ips}'}, timeout=2)
+            res = requests.get('http://httpbin.org/ip', headers=self.headers, proxies={'http': f'{ips}'}, timeout=10)
             if res.json()['origin'] and res.status_code == 200:
                 print('IP可用', ips)
                 return ips
@@ -48,22 +88,11 @@ class GETIP:
             })
         return {"ip_list": ips, "ip_count": len(ips)}
 
-    def check_ip_list(self):
+    async def check_ip_list(self):
         success = errors = 0
-        for ip in self.collection.find({}):
-            try:
-                res = requests.get('http://httpbin.org/ip', headers=self.headers, proxies={'http': f"{ip['http']}"},
-                                   timeout=2)
-                if res.json()['origin'] and res.status_code == 200:
-                    print('IP可用', ip)
-                    ip['time'] = time.time()
-                    self.collection.update_one({'http': ip['http']}, {"$set": ip})
-                    success += 1
-            except Exception as e:
-                print('error信息--->', e)
-                print(f'IP不可用,正在删除:{ip}')
-                self.collection.delete_one({'http': ip['http']})
-                errors += 1
+        checker = IPChecker()
+        result = await checker.check_ip_list()
+        print(result)
         return {"status": True, "success": success, 'errors': errors}
 
     def run(self):
@@ -73,4 +102,4 @@ class GETIP:
 
 
 if __name__ == '__main__':
-    GETIP().run()
+    GETIP().check_ip_list()

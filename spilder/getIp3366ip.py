@@ -34,15 +34,19 @@ class GetIp3366:
         ip_list = []
         res = requests.get(url, headers=self.headers)
         html = etree.HTML(res.text)
-        ip_port = [i.strip() for i in html.xpath('//tr/td[position()<=2]/text()')]
-        for q in range(0, 15, 2):
-            ip_a_port = 'https://' + str(ip_port[q]) + ':' + str(ip_port[q + 1])
-            ip_list.append(ip_a_port)
+        ip_trs = html.xpath('//*[@id="list"]/table/tbody/tr')
+        for tr in ip_trs:
+            ip = tr.xpath("./td[1]/text()")[0]
+            prot = tr.xpath("./td[2]/text()")[0]
+            xy  = tr.xpath("./td[4]/text()")[0].lower()
+            ip_list.append(xy + "://" + str(ip) +":" + str(prot)) 
         return ip_list
 
     def check_ip(self, ip):
+        ip_info = ip.split("//")
+        print(ip_info)
         try:
-            res = requests.get('http://httpbin.org/ip', headers=self.headers, proxies={'http': ip},
+            res = requests.get('http://httpbin.org/ip', headers=self.headers, proxies={ip_info[0].replace('.',''): ip_info[1]},
                                timeout=2)
             if res.status_code == 200:
                 print('IP可用-->', ip)
@@ -51,7 +55,7 @@ class GetIp3366:
             pass
 
     def save_data(self, ok_ip_list):
-        client = pymongo.MongoClient(host='localhost', port=27017,username='username',password='password')
+        client = pymongo.MongoClient(host='localhost', port=27017)
         db = client["ip_proxy"]
         for d in ok_ip_list:
             exists = db.ip_proxy.count_documents({'http': d, 'time': time.time()})
@@ -71,9 +75,13 @@ class GetIp3366:
         for i in ip_list:
             ip_lists += i
         pool2 = Pool(processes=5)
+        print(ip_lists)
         check_ip_list = pool2.map(self.check_ip, ip_lists)
         ok_ip = [i for i in check_ip_list if i is not None]
-        self.save_data(ok_ip)
+        if (ok_ip):  
+            self.save_data(ok_ip)
+        else:
+            print('======')    
         print('用时:', time.time() - start)
 
 

@@ -34,8 +34,10 @@ class GetKxDaiLiIp:
 
     def get_data(self, url):
         ip_list = []
+        print(url)
         res = requests.get(url, headers=self.headers)
-        html = etree.HTML(res.content.decode('utf-8'))
+        res.encoding = res.apparent_encoding
+        html = etree.HTML(res.content)
         ip_port = [i.strip() for i in html.xpath('//tr/td[position()<=2]/text()')]
         for q in range(0, 10, 2):
             ip_a_port = 'http://' + str(ip_port[q]) + ':' + str(ip_port[q + 1])
