@@ -9,7 +9,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 class IPChecker:
     def __init__(self):
-        self.client =  AsyncIOMotorClient()
+        self.client = AsyncIOMotorClient()
         self.collection = self.client.your_database.your_collection
         self.headers = {'User-Agent': 'Your User Agent'}
 
@@ -59,21 +59,36 @@ class GETIP:
         self.collection = self.client["ip_proxy"]['ip_proxy']
 
     def get_ip(self):
-        ip_list = self.collection.distinct('http')
-        print(f'获取ip{len(ip_list)}个', )
-        ips = random.choice(ip_list)
-        print('用这个ip请求--->', ips)
-        try:
-            res = requests.get('http://httpbin.org/ip', headers=self.headers, proxies={'http': f'{ips}'}, timeout=10)
-            if res.json()['origin'] and res.status_code == 200:
-                print('IP可用', ips)
-                return ips
-        except Exception as e:
-            print('error信息--->', e)
-            print(f'IP不可用,正在删除:{ips}')
-            ip_list.remove(ips)
-            self.collection.delete_one({'http': ips})
-            self.get_ip()
+        while True:
+            # 从集合中获取所有不同的代理 IP
+            ip_list = self.collection.distinct('http')
+            print(f'获取到 {len(ip_list)} 个 IP')
+
+            if not ip_list:
+                print("代理池为空，无法获取可用 IP")
+                return None
+
+            # 随机选择一个 IP
+            ips = random.choice(ip_list)
+            print(f'尝试使用 IP ---> {ips}')
+            ip_info = ips.split("//")
+            try:
+                # 测试代理 IP 是否可用
+                res = requests.get(
+                    'http://httpbin.org/ip',
+                    headers=self.headers,
+                    proxies={ip_info[0].replace(':',''):ip_info[1]},
+                    timeout=10
+                )
+                # 检查响应状态
+                if res.status_code == 200 and 'origin' in res.json():
+                    print(f'IP 可用 ---> {ips}')
+                    return ips
+            except Exception as e:
+                # 如果代理不可用
+                print(f'错误信息 ---> {e}')
+                print(f'IP 不可用，正在删除: {ips}')
+                self.collection.delete_one({'http': ips})
 
     def get_all_ip_list(self):
         ip_list = self.collection.find({})
@@ -102,4 +117,4 @@ class GETIP:
 
 
 if __name__ == '__main__':
-    GETIP().check_ip_list()
+    GETIP().run()

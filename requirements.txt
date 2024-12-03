@@ -4,5 +4,5 @@ gevent==22.10.2
 logger==1.4
 lxml==4.9.2
 motor==3.6.0
-pymongo==4.3.3
+pymongo==4.10.1
 Requests==2.32.3
