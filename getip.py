@@ -6,9 +6,10 @@ import time
 import aiohttp
 import pymongo
 import requests
-from aiohttp import ClientTimeout, ClientError
 from motor.motor_asyncio import AsyncIOMotorClient
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 
 class IPChecker:
     def __init__(self):
@@ -19,28 +20,32 @@ class IPChecker:
     async def check_single_ip(self, ip, max_retries=3):
         for attempt in range(max_retries):
             ip_info = ip['http'].split("//")
+            proxy = {ip_info[0].replace(':', ''): ip_info[1]}  # 构建代理字典
+            print(f"尝试代理: {proxy}")
+
             try:
-                timeout = ClientTimeout(total=10)
-                async with aiohttp.ClientSession(timeout=timeout) as session:
-                    async with session.get('http://httpbin.org/ip',
-                                           headers=self.headers,
-                                           proxy=f"{ip_info[0].replace(':','')}://{ip_info[1]}") as res:
-                        if res.status == 200:
-                            json_res = await res.json()
-                            if 'origin' in json_res:
-                                logging.info(f'IP可用: {ip}')
-                                ip['time'] = time.time()
-                                await self.collection.update_one({'http': ip['http']}, {"$set": ip})
-                                return True
-                        logging.warning(f'IP {ip["http"]} 返回状态码 {res.status}')
-            except (ClientError, TimeoutError) as e:
-                logging.error(f'尝试 {attempt + 1}/{max_retries} 失败 {ip["http"]}: {str(e)}')
+                # 将同步请求封装到函数中
+                def sync_request():
+                    return requests.get(
+                        'http://httpbin.org/ip',
+                        headers=self.headers,
+                        proxies=proxy,
+                        timeout=10
+                    )
+
+                # 在异步环境中运行同步请求
+                res = await asyncio.to_thread(sync_request)
+
+                logging.warning(f'IP {ip["http"]} 返回状态码 {res.status_code}')
+                if res.status_code == 200:
+                    print('IP可用-->', ip)
+                    await self.collection.update_one({'http': ip['http']}, {'$set': {'time': time.time()}})
+                    return ip
+            except Exception as e:
+                logging.error(f'尝试 {attempt + 1}/{max_retries} 失败 {ip["http"]}: {str(e)}', exc_info=True)
                 if attempt == max_retries - 1:
                     break
                 await asyncio.sleep(1)  # 在重试之前等待1秒
-            except Exception as e:
-                logging.error(f'未知错误 {ip["http"]}: {str(e)}')
-                break
 
         logging.info(f'IP不可用,正在删除: {ip}')
         await self.collection.delete_one({'http': ip['http']})
@@ -70,6 +75,7 @@ class IPChecker:
 
         logging.info(f"Check completed. Success: {success}, Errors: {errors}")
         return {"status": True, "success": success, 'errors': errors}
+
 
 class GETIP:
     def __init__(self):
@@ -103,7 +109,7 @@ class GETIP:
                 res = requests.get(
                     'http://httpbin.org/ip',
                     headers=self.headers,
-                    proxies={ip_info[0].replace(':',''):ip_info[1]},
+                    proxies={ip_info[0].replace(':', ''): ip_info[1]},
                     timeout=10
                 )
                 # 检查响应状态
@@ -153,4 +159,5 @@ class GETIP:
 
 
 if __name__ == '__main__':
-    GETIP().check_ip_list()
+    asyncio.run(GETIP().check_ip_list())
+

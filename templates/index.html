@@ -50,24 +50,26 @@
         let element = layui.element;
         let $ = layui.$
         let layer = layui.layer
-        window.check = function () {
-            var loading = layer.load();
-            $.ajax({
-                type: 'GET',
-                url: './check',
-                async: false,
-                success: function (res) {
-                    console.log(res)
-                    if (res.status) {
-                        layer.close(loading)
-                        layer.alert('清洗成功')
-                        window.reload()
-                    }
-                    {#layer.close(loading)#}
-                    {#layer.alert('清洗成功')#}
+        window.check = async function () {
+            const loading = layer.load();
+            try {
+                const response = await fetch('./check', {
+                    method: 'GET'
+                });
+                const res = await response.json();
+                console.log(res);
+
+                if (res.status) {
+                    layer.close(loading);
+                    layer.alert('清洗成功');
+                    window.location.reload();
                 }
-            })
-            return false
+            } catch (error) {
+                console.error('Error:', error);
+                layer.close(loading);
+                layer.alert('请求失败');
+            }
+            return false;
         }
     })
 </script>
