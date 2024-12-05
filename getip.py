@@ -34,13 +34,13 @@ class IPChecker:
                     )
 
                 # 在异步环境中运行同步请求
-                res = await asyncio.to_thread(sync_request)
+                res = await asyncio.get_running_loop().run_in_executor(None, sync_request)
 
                 logging.warning(f'IP {ip["http"]} 返回状态码 {res.status_code}')
                 if res.status_code == 200:
                     print('IP可用-->', ip)
                     await self.collection.update_one({'http': ip['http']}, {'$set': {'time': time.time()}})
-                    return ip
+                    return ip['http']
             except Exception as e:
                 logging.error(f'尝试 {attempt + 1}/{max_retries} 失败 {ip["http"]}: {str(e)}', exc_info=True)
                 if attempt == max_retries - 1:
@@ -55,6 +55,7 @@ class IPChecker:
         logging.info("Starting check_ip_list")
         success = errors = 0
         tasks = []
+        results = []
         async for ip in self.collection.find({}):
             logging.info(f"Adding task for IP: {ip['http']}")
             tasks.append(self.check_single_ip(ip))
