@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # @Time    : 2024/12/3 14:04
-# @Author  : PFinal南丞 <lampxiezi@163.com
+# @Author  : PFinal南丞 <lampxiezi@163.com>
 # @File    : getLumiproxy.py
 # @Software: PyCharm
 import time
@@ -39,14 +39,12 @@ class GetLumiproxy:
     def check_ip(self, ip):
         """check_ip"""
         ip_info = ip.split("//")
-        print(ip_info)
         try:
             res = requests.get('http://httpbin.org/ip', headers=self.headers, proxies={ip_info[0].replace(':',''): ip_info[1]}, timeout=2)
             if res.status_code == 200:
-                print('IP可用-->', ip)
                 return ip
         except Exception:
-            print('IP不可用-->', ip)
+            return None
 
     def params_list(self):
         params_list = []

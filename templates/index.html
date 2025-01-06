@@ -53,7 +53,7 @@
         window.check = async function () {
             const loading = layer.load();
             try {
-                const response = await fetch('./check', {
+                const response = await fetch('./check?key=123321', {
                     method: 'GET'
                 });
                 const res = await response.json();

@@ -21,7 +21,7 @@ def run():
     # }
     # scheduler = BackgroundScheduler(executors=executors)
     try:
-        GetLumiproxy(2).run()
+        GetLumiproxy(1).run()
         # GetIp3366(1).run()  # 导入Ip3366
         # GetGeoNode().run()
         # get66Ip()
