@@ -3,6 +3,7 @@
 # @Author  : PFinal南丞 <lampxiezi@163.com
 # @File    : run.py
 # @Software: PyCharm
+import asyncio
 
 from logger import logger
 
@@ -21,11 +22,13 @@ def run():
     # }
     # scheduler = BackgroundScheduler(executors=executors)
     try:
+        # asyncio.run(GetLumiproxy(1).run())
+
         GetLumiproxy(1).run()
-        # GetIp3366(1).run()  # 导入Ip3366
-        # GetGeoNode().run()
-        # get66Ip()
-        # GetBeesproxy(1).run()
+        GetIp3366(1).run()  # 导入Ip3366
+        GetGeoNode().run()
+        get66Ip()
+        GetBeesproxy(1).run()
 
     except Exception as e:
         print(e)

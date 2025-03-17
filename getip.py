@@ -32,72 +32,81 @@ class IPChecker:
         :param max_retries:
         :return:
         """
-        for attempt in range(max_retries):
-            ip_info = ip['http'].split("//")
-            proxy = {ip_info[0].replace(':', ''): ip_info[1]}  # 构建代理字典
-            logging.info(f"尝试代理: {proxy}")
+        return await check_single_ip(ip, self.headers, self.test_urls, max_retries)
 
-            for test_url in self.test_urls:
-                try:
-                    # 将同步请求封装到函数中
-                    def sync_request():
-                        """
-
-                        :return:
-                        """
-                        return requests.get(
-                            test_url,
-                            headers=self.headers,
-                            proxies=proxy,
-                            timeout=10
-                        )
-
-                    # 在异步环境中运行同步请求
-                    res = await asyncio.get_running_loop().run_in_executor(None, sync_request)
-
-                    logging.info(f'IP {ip["http"]} 返回状态码 {res.status_code} 使用 URL {test_url}')
-                    if res.status_code == 200:
-                        logging.info(f'IP可用-->{ip} 使用 URL {test_url}')
-                        await self.collection.update_one({'http': ip['http']}, {'$set': {'time': time.time()}})
-                        return ip['http']
-                except Exception as e:
-                    logging.error(f'尝试 {attempt + 1}/{max_retries} 失败 {ip["http"]} 使用 URL {test_url}: {str(e)}', exc_info=True)
-                    if attempt == max_retries - 1:
-                        break
-                await asyncio.sleep(1)  # 在重试之前等待1秒
-
-        logging.info(f'IP不可用, 正在删除: {ip}')
-        await self.collection.delete_one({'http': ip['http']})
-        return False
+    async def process_ip(self, ip):
+        """Process and update the IP in the database."""
+        result = await self.check_single_ip(ip)
+        if result:
+            await self.collection.update_one({'http': ip['http']}, {'$set': {'time': time.time()}})
+        else:
+            await self.collection.delete_one({'http': ip['http']})
 
     async def check_ip_list(self):
         """
-
+        检查IP列表
         :return:
         """
-        print("Starting check_ip_list")
+        logging.info("Starting check_ip_list")
         success = errors = 0
         tasks = []
         async for ip in self.collection.find({}):
             logging.info(f"Adding task for IP: {ip['http']}")
-            tasks.append(self.check_single_ip(ip))
+            tasks.append(self.process_ip(ip))
 
         if not tasks:
             logging.warning("No tasks created. Database might be empty.")
         else:
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            await asyncio.gather(*tasks)
 
-            for result in results:
-                if isinstance(result, Exception):
-                    print(f"Error occurred: {str(result)}")
-                    errors += 1
-                elif result:
-                    success += 1
-                else:
-                    errors += 1
-
-        print(f"Check completed. Success: {success}, Errors: {errors}")
+        logging.info(f"Check completed. Success: {success}, Errors: {errors}")
         return {"status": True, "success": success, 'errors': errors}
+
+
+async def check_single_ip(ip, headers, test_urls, max_retries=3):
+    """
+    检查单个IP的可用性
+    :param ip: 要检查的IP地址
+    :param headers: 请求头
+    :param test_urls: 测试URL列表
+    :param max_retries: 最大重试次数
+    :return: 可用的IP地址或False
+    """
+    for attempt in range(max_retries):
+        ip_info = ip['http'].split("//")
+        proxy = {ip_info[0].replace(':', ''): ip_info[1]}  # 构建代理字典
+        logging.info(f"尝试代理: {proxy}")
+
+        for test_url in test_urls:
+            try:
+                # 将同步请求封装到函数中
+                def sync_request():
+                    """
+                    执行同步请求
+                    :return: 请求响应
+                    """
+                    return requests.get(
+                        test_url,
+                        headers=headers,
+                        proxies=proxy,
+                        timeout=10
+                    )
+
+                # 在异步环境中运行同步请求
+                res = await asyncio.get_running_loop().run_in_executor(None, sync_request)
+
+                logging.info(f'IP {ip["http"]} 返回状态码 {res.status_code} 使用 URL {test_url}')
+                if res.status_code == 200:
+                    logging.info(f'IP可用-->{ip} 使用 URL {test_url}')
+                    return ip['http']
+            except Exception as e:
+                logging.error(f'尝试 {attempt + 1}/{max_retries} 失败 {ip["http"]} 使用 URL {test_url}: {str(e)}', exc_info=True)
+                if attempt == max_retries - 1:
+                    break
+            await asyncio.sleep(1)  # 在重试之前等待1秒
+
+    logging.info(f'IP不可用: {ip}')
+    return False
 
 
 async def check_ip_list():

@@ -3,15 +3,25 @@
 # @Author  : PFinal南丞 <lampxiezi@163.com>
 # @File    : getLumiproxy.py
 # @Software: PyCharm
+import asyncio
+import logging
 import time
-from multiprocessing import Pool
 
-import pymongo
-import requests
+import aiohttp
+from motor.motor_asyncio import AsyncIOMotorClient
+
+from getip import check_single_ip
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 class GetLumiproxy:
-    def __init__(self, page):
+    """
+    GetLumiproxy class for fetching and processing proxy data from the API.
+    """
+
+    def __init__(self, page, mongo_host='localhost', mongo_port=27017):
         self.url = 'https://api.lumiproxy.com/web_v1/free-proxy/list'
         self.headers = {
             "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
@@ -35,71 +45,66 @@ class GetLumiproxy:
             "page": "1",
             "language": "zh-hans"
         }
-
-    def check_ip(self, ip):
-        """check_ip"""
-        ip_info = ip.split("//")
-        try:
-            res = requests.get('http://httpbin.org/ip', headers=self.headers, proxies={ip_info[0].replace(':',''): ip_info[1]}, timeout=2)
-            if res.status_code == 200:
-                return ip
-        except Exception:
-            return None
+        self.mongo_host = mongo_host
+        self.mongo_port = mongo_port
+        self.client = AsyncIOMotorClient(mongo_host, mongo_port)
+        self.collection = self.client['ip_proxy']['ip_proxy']
 
     def params_list(self):
+        """Generate list of parameters for each page."""
         params_list = []
         for i in range(1, self.max_page + 1):
-            self.params['page'] = str(i)
-            params_list.append(self.params)
+            params = self.params.copy()
+            params['page'] = str(i)
+            params_list.append(params)
         return params_list
 
-    def get_data(self, params_list):
-        """get_data"""
+    async def fetch_data(self, session, params):
+        """Fetch proxy data from the API asynchronously."""
         ip_list = []
         try:
-            res = requests.get(self.url, headers=self.headers, params=params_list, timeout=2)
-            res.encoding = res.apparent_encoding
-            data = res.json()['data']['list']
-            for i in data:
-                ip = i['ip']
-                port = i['port']
-                ip_a_port = 'http://' + str(ip) + ':' + str(port)
-                ips_a_port = 'https://' + str(ip) + ':' + str(port)
-                ip_list.append(ip_a_port)
-                ip_list.append(ips_a_port)
-            return ip_list
+            async with session.get(self.url, headers=self.headers, params=params, timeout=10) as res:
+                if res.status == 200:
+                    data = await res.json()
+                    for i in data['data']['list']:
+                        ip = i['ip']
+                        port = i['port']
+                        ip_a_port = f'http://{ip}:{port}'
+                        ips_a_port = f'https://{ip}:{port}'
+                        ip_list.append(ip_a_port)
+                        ip_list.append(ips_a_port)
         except Exception as e:
-            print(e)
-            return []
+            logging.error(f"Error fetching data with params {params}: {e}")
+        return ip_list
 
-    def save_data(self, ok_ip_list):
-        """save_data"""
-        client = pymongo.MongoClient(host='localhost', port=27017)
-        db = client["ip_proxy"]
-        for d in ok_ip_list:
-            exists = db.ip_proxy.count_documents({'http': d, 'time': time.time()})
-            if exists == 0:
-                db.ip_proxy.insert_one({'http': d, 'time': time.time()})
-                print("录入新IP:", d)
-            else:
-                print("当前IP已经录入:", d)
-        client.close()
+    async def process_ip(self, ip):
+        """Process and update the IP in the database."""
+        test_urls = [
+            'http://httpbin.org/ip',
+            'https://api.ipify.org',
+            'http://ip-api.com/json'
+        ]
+        result = await check_single_ip(ip, self.headers, test_urls)
+        if result:
+            await self.collection.update_one({'http': ip}, {'$set': {'time': time.time()}})
+        else:
+            await self.collection.delete_one({'http': ip})
 
-    def run(self):
+    async def run(self):
+        """Run the proxy fetching process."""
         start = time.time()
-        pool = Pool(processes=2)
         params_list = self.params_list()
-        ip_list = pool.map(self.get_data, params_list)
-        ip_lists = []
-        for i in ip_list:
-            ip_lists += i
-        print(ip_lists)
-        pool2 = Pool(processes=5)
-        check_ip_list = pool2.map(self.check_ip, ip_lists)
-        ok_ip = [i for i in check_ip_list if i is not None]
-        self.save_data(ok_ip)
-        print('用时:', time.time() - start)
+        async with aiohttp.ClientSession() as session:
+            tasks = [self.fetch_data(session, params) for params in params_list]
+            all_ip_lists = await asyncio.gather(*tasks)
+
+        ip_lists = [ip for sublist in all_ip_lists for ip in sublist]
+        logging.info(f"Fetched IPs: {ip_lists}")
+
+        tasks = [self.process_ip(ip) for ip in ip_lists]
+        await asyncio.gather(*tasks)
+        logging.info(f"Total time taken: {time.time() - start} seconds")
 
 
 if __name__ == '__main__':
-    GetLumiproxy(20).run()
+    asyncio.run(GetLumiproxy(20).run())
