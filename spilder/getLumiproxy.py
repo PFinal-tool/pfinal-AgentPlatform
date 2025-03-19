@@ -12,6 +12,8 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from getip import check_single_ip
 
+from .base_proxy_scraper import BaseProxyScraper
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -108,3 +110,43 @@ class GetLumiproxy:
 
 if __name__ == '__main__':
     asyncio.run(GetLumiproxy(20).run())
+
+
+class GetLumiproxy(BaseProxyScraper):
+    def __init__(self):
+        headers = {
+            # 这里根据实际情况设置请求头
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36"
+        }
+        url = ["https://api.lumiproxy.com"]
+        super().__init__(headers, url)
+
+    def get_html(self):
+        return self.url
+
+    async def fetch(self, session, url):
+        async with session.get(url, headers=self.headers, timeout=2) as response:
+            return await response.text()
+
+    async def get_data_async(self, url):
+        ip_list = []
+        try:
+            async with aiohttp.ClientSession() as session:
+                html = await self.fetch(session, url)
+                # 这里需要根据实际返回的 JSON 或 HTML 格式解析出 IP 地址
+                # 示例代码假设返回的是 JSON 格式，且有 'ips' 字段包含 IP 列表
+                import json
+                data = json.loads(html)
+                if 'ips' in data:
+                    for ip in data['ips']:
+                        ip_list.append(f'http://{ip}')
+        except Exception as e:
+            print(f"获取数据失败: {url}, 错误: {e}")
+        return ip_list
+
+    def get_data(self, url):
+        loop = asyncio.get_event_loop()
+        return loop.run_until_complete(self.get_data_async(url))
+
+if __name__ == '__main__':
+    GetLumiproxy().run()

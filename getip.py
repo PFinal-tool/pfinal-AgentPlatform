@@ -5,6 +5,7 @@ import time
 
 import pymongo
 import requests
+import urllib3  # 新增导入
 from motor.motor_asyncio import AsyncIOMotorClient
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -99,10 +100,16 @@ async def check_single_ip(ip, headers, test_urls, max_retries=3):
                 if res.status_code == 200:
                     logging.info(f'IP可用-->{ip} 使用 URL {test_url}')
                     return ip['http']
+            except requests.exceptions.ConnectTimeout:
+                logging.error(f'尝试 {attempt + 1}/{max_retries} 连接超时 {ip["http"]} 使用 URL {test_url}')
+            except urllib3.exceptions.MaxRetryError:  # 修正异常引用
+                logging.error(f'尝试 {attempt + 1}/{max_retries} 重试次数超限 {ip["http"]} 使用 URL {test_url}')
+            except requests.exceptions.ReadTimeout:  # 新增异常处理
+                logging.error(f'尝试 {attempt + 1}/{max_retries} 读取超时 {ip["http"]} 使用 URL {test_url}')
             except Exception as e:
                 logging.error(f'尝试 {attempt + 1}/{max_retries} 失败 {ip["http"]} 使用 URL {test_url}: {str(e)}', exc_info=True)
-                if attempt == max_retries - 1:
-                    break
+            if attempt == max_retries - 1:
+                break
             await asyncio.sleep(1)  # 在重试之前等待1秒
 
     logging.info(f'IP不可用: {ip}')
@@ -213,3 +220,4 @@ class GETIP:
 
 if __name__ == '__main__':
     asyncio.run(check_ip_list())
+

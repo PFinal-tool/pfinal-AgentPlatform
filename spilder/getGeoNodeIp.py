@@ -10,52 +10,35 @@ from multiprocessing import Pool
 import pymongo
 import requests
 
+from .base_proxy_scraper import BaseProxyScraper
+import json
 
-class GetGeoNode:
+class GetGeoNodeIp(BaseProxyScraper):
     def __init__(self):
-        self.url = 'https://proxylist.geonode.com/api/proxy-list?limit=500&page=1&sort_by=lastChecked&sort_type=desc&protocols=http%2Chttps'
+        headers = {
+            # 这里根据实际情况设置请求头
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36"
+        }
+        url = ["https://proxylist.geonode.com/api/proxy-list"]
+        super().__init__(headers, url)
+
+    def get_html(self):
+        return self.url
 
     def get_data(self, url):
         ip_list = []
-        res = requests.get(url)
-        ips = res.json()['data']
-        for ip in ips:
-            ip_a_port = ip.get('protocols')[0] + '://' + str(ip.get('ip')) + ':' + str(ip.get('port'))
-            ip_list.append(ip_a_port)
+        try:
+            res = requests.get(url, headers=self.headers, timeout=2)
+            data = json.loads(res.text)
+            if 'data' in data:
+                for item in data['data']:
+                    ip = item.get('ip')
+                    port = item.get('port')
+                    if ip and port:
+                        ip_list.append(f'http://{ip}:{port}')
+        except Exception as e:
+            print(f"获取数据失败: {url}, 错误: {e}")
         return ip_list
 
-    def save_data(self, ok_ip_list):
-        client = pymongo.MongoClient(host='localhost', port=27017)
-        db = client["ip_proxy"]
-        for d in ok_ip_list:
-            exists = db.ip_proxy.count_documents({'http': d, 'time': time.time()})
-            if exists == 0:
-                db.ip_proxy.insert_one({'http': d, 'time': time.time()})
-                print("录入新IP:", d)
-            else:
-                print("当前IP已经录入:", d)
-        client.close()
-
-    def check_ip(self, ip):
-        ip_info = ip.split("//")
-        try:
-            res = requests.get('http://httpbin.org/ip', proxies={ip_info[0].replace(':',''): ip_info[1]},
-                               timeout=2)
-            if res.status_code == 200:
-                print('IP可用-->', ip)
-                return ip
-        except Exception:
-            pass
-
-    def run(self):
-        start = time.time()
-        ip_lists = self.get_data(self.url)
-        pool2 = Pool(processes=5)
-        check_ip_list = pool2.map(self.check_ip, ip_lists)
-        ok_ip = [i for i in check_ip_list if i is not None]
-        self.save_data(ok_ip)
-        print('用时:', time.time() - start)
-
-
 if __name__ == '__main__':
-    GetGeoNode().run()
+    GetGeoNodeIp().run()

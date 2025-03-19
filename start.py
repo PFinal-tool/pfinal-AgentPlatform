@@ -44,7 +44,6 @@ async def check():
     :return:
     """
     key = request.args.get('key')
-    print(key)
     if key != '123321':
         logging.warning("Invalid key provided for /check route")
         return jsonify({'status': False, 'data': None})

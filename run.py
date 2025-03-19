@@ -1,40 +1,38 @@
-# -*- coding: utf-8 -*-
-# @Time    : 2023/5/16 13:58
-# @Author  : PFinal南丞 <lampxiezi@163.com
-# @File    : run.py
-# @Software: PyCharm
-import asyncio
+import sys
+import os
 
-from logger import logger
-
-from spilder.get66ip import get66Ip
-from spilder.getBeesproxy import GetBeesproxy
-from spilder.getGeoNodeIp import GetGeoNode
-from spilder.getIp3366ip import GetIp3366
+from spilder.get66ip import GetFreeIP
+from spilder.getGeoNodeIp import GetGeoNodeIp
+from spilder.getIp3366ip import GetIp3366ip
 from spilder.getLumiproxy import GetLumiproxy
+from spilder.getBeesproxy import GetBeesproxy
+from spilder.getkxdailiip import Getkxdailiip
+
+# 获取当前脚本所在的目录
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# 将 spilder 目录添加到 sys.path 中
+spilder_dir = os.path.join(current_dir, 'spilder')
+sys.path.append(spilder_dir)
+
+import time
+import schedule
 
 
 def run():
-    """Run the"""
-    logger.info("开始定时")
-    # executors = {
-    #     'default': ThreadPoolExecutor(30)  # 最大线程数30
-    # }
-    # scheduler = BackgroundScheduler(executors=executors)
-    try:
-        # asyncio.run(GetLumiproxy(1).run())
+    # 执行抓取任务
+    GetFreeIP(start_page=21, end_page=200).run()
+    GetLumiproxy().run()
 
-        GetLumiproxy(1).run()
-        GetIp3366(1).run()  # 导入Ip3366
-        GetGeoNode().run()
-        get66Ip()
-        GetBeesproxy(1).run()
+    GetBeesproxy().run()
+    GetGeoNodeIp().run()
 
-    except Exception as e:
-        print(e)
-
-    # scheduler.start()
+    Getkxdailiip().run()
+    GetIp3366ip().run()
 
 
 if __name__ == '__main__':
-    run()
+    # 每天的 00:00 执行任务
+    schedule.every().day.at("00:00").do(run)
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
